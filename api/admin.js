@@ -1,6 +1,11 @@
 import { Redis } from '@upstash/redis';
 
-const redis = Redis.fromEnv();
+// Создаём клиент, используя переменные с префиксом storage_
+const redis = new Redis({
+  url: process.env.storage_KV_REST_API_URL || process.env.storage_REDIS_URL,
+  token: process.env.storage_KV_REST_API_TOKEN,
+});
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
