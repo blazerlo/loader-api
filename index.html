@@ -5,8 +5,8 @@
     <title>Key Manager</title>
     <style>
         body { font-family: Arial; background: #1a1a1a; color: #eee; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
-        input, button { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
+        .container { max-width: 900px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
+        input, button, textarea { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
         button { background: #6c5ce7; color: #fff; cursor: pointer; }
         button.danger { background: #e74c3c; }
         button.success { background: #27ae60; }
@@ -17,6 +17,8 @@
         .status-badge { padding: 2px 10px; border-radius: 20px; background: #333; }
         .error { color: #e74c3c; }
         .success-msg { color: #2ecc71; }
+        textarea { width: 100%; height: 200px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
+        .code-section { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
     </style>
 </head>
 <body>
@@ -33,6 +35,7 @@
 
     <!-- Панель (скрыта до логина) -->
     <div id="panel" style="display:none;">
+        <!-- Управление ключами -->
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
             <input type="text" id="newKey" placeholder="New key">
             <select id="newStatus">
@@ -52,6 +55,17 @@
             </thead>
             <tbody id="keysTable"></tbody>
         </table>
+
+        <!-- Блок для загрузки кода -->
+        <div class="code-section">
+            <h3>📄 Script Code</h3>
+            <p>Paste your Lua script here and click Save Code. This code will be returned when a valid key is used.</p>
+            <textarea id="scriptCode" placeholder="-- Paste your script here"></textarea>
+            <br>
+            <button class="success" onclick="saveCode()">💾 Save Code</button>
+            <button onclick="loadCode()">📂 Load Current Code</button>
+            <span id="codeMessage" style="margin-left: 10px;"></span>
+        </div>
     </div>
 </div>
 
@@ -65,12 +79,12 @@
             return;
         }
         password = pwd;
-        // Проверяем логин, попробовав получить список ключей
         fetchKeys(true).then(success => {
             if (success) {
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('panel').style.display = 'block';
                 document.getElementById('loginError').innerText = '';
+                loadCode(); // загружаем текущий код при входе
             } else {
                 document.getElementById('loginError').innerText = 'Wrong password or server error';
             }
@@ -83,6 +97,7 @@
         password = '';
         document.getElementById('adminPassword').value = '';
         document.getElementById('keysTable').innerHTML = '';
+        document.getElementById('scriptCode').value = '';
     }
 
     async function fetchKeys(silent) {
@@ -195,6 +210,51 @@
 
     function refreshKeys() {
         fetchKeys(false);
+    }
+
+    // ---------- CODE MANAGEMENT ----------
+    async function saveCode() {
+        const code = document.getElementById('scriptCode').value;
+        if (!code.trim()) {
+            showMessage('Code cannot be empty', 'error');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setCode', code })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage('Code saved successfully!', 'success');
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #2ecc71;">✅ Saved</span>';
+            } else {
+                showMessage('Error saving code: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function loadCode() {
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'getCode' })
+            });
+            const data = await resp.json();
+            if (data.success && data.code !== undefined && data.code !== null) {
+                document.getElementById('scriptCode').value = data.code;
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #3498db;">📥 Loaded</span>';
+            } else {
+                document.getElementById('scriptCode').value = '';
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #e67e22;">⚠️ No code found</span>';
+            }
+        } catch (e) {
+            document.getElementById('codeMessage').innerHTML = '<span style="color: #e74c3c;">❌ Error loading</span>';
+        }
     }
 
     function showMessage(msg, type) {
