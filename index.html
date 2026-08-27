@@ -15,6 +15,7 @@
         th, td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
         .link { color: #2ecc71; font-weight: bold; }
         .unlink { color: #e74c3c; font-weight: bold; }
+        .used { color: #f39c12; font-weight: bold; }
         .status-badge { padding: 2px 10px; border-radius: 20px; background: #333; }
         .hwid-status {
             display: inline-block;
@@ -36,6 +37,8 @@
         .double-section .section textarea { height: 200px; }
         .loader-hint { background: #1a1a1a; padding: 10px; border-radius: 5px; margin-top: 10px; font-family: monospace; font-size: 12px; color: #888; }
         .loader-hint code { color: #2ecc71; }
+        .one-time-check { display: flex; align-items: center; gap: 10px; margin: 5px; }
+        .one-time-check input[type="checkbox"] { width: 18px; height: 18px; }
     </style>
 </head>
 <body>
@@ -51,12 +54,16 @@
 
     <div id="panel" style="display:none;">
         <!-- Управление ключами -->
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; align-items: center;">
             <input type="text" id="newKey" placeholder="New key">
             <select id="newStatus">
                 <option value="link">link</option>
                 <option value="unlink">unlink</option>
             </select>
+            <div class="one-time-check">
+                <label for="oneTimeCheck">One-time</label>
+                <input type="checkbox" id="oneTimeCheck">
+            </div>
             <button class="success" onclick="createKey()">➕ Create</button>
             <button onclick="refreshKeys()">🔄 Refresh</button>
             <button class="danger" onclick="logout()">🚪 Logout</button>
@@ -66,7 +73,7 @@
 
         <table>
             <thead>
-                <tr><th>Key</th><th>Status</th><th>HWID</th><th>Action</th></tr>
+                <tr><th>Key</th><th>Status</th><th>HWID</th><th>MAC</th><th>One-Time</th><th>Used</th><th>Action</th></tr>
             </thead>
             <tbody id="keysTable"></tbody>
         </table>
@@ -156,21 +163,28 @@
         const table = document.getElementById('keysTable');
         table.innerHTML = '';
         if (!keys || keys.length === 0) {
-            table.innerHTML = '<tr><td colspan="4">No keys found</td></tr>';
+            table.innerHTML = '<tr><td colspan="7">No keys found</td></tr>';
             return;
         }
         keys.forEach(item => {
             const tr = document.createElement('tr');
-            const statusClass = item.status === 'link' ? 'link' : 'unlink';
+            const statusClass = item.status === 'link' ? 'link' : (item.used ? 'used' : 'unlink');
+            const statusText = item.used ? 'used' : (item.status || 'unlink');
             const hwidDisplay = item.hwid || 'Not bound';
             const hwidClass = item.hwid ? 'hwid-bound' : 'hwid-unbound';
+            const macDisplay = item.mac || 'Not bound';
+            const oneTimeDisplay = item.oneTime ? '✅' : '❌';
+            const usedDisplay = item.used ? '✅' : '❌';
             tr.innerHTML = `
                 <td><code>${item.key}</code></td>
-                <td><span class="status-badge ${statusClass}">${item.status || 'unlink'}</span></td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 <td>
                     <span class="hwid-status ${hwidClass}"></span>
                     <span style="font-family: monospace; font-size: 12px;">${hwidDisplay}</span>
                 </td>
+                <td style="font-family: monospace; font-size: 12px;">${macDisplay}</td>
+                <td>${oneTimeDisplay}</td>
+                <td>${usedDisplay}</td>
                 <td>
                     <button class="danger" onclick="deleteKey('${item.key}')">🗑️</button>
                     <button onclick="toggleStatus('${item.key}', '${item.status}')">🔄 Toggle</button>
@@ -185,6 +199,7 @@
     async function createKey() {
         const key = document.getElementById('newKey').value.trim();
         const status = document.getElementById('newStatus').value;
+        const oneTime = document.getElementById('oneTimeCheck').checked;
         if (!key) {
             showMessage('Enter a key name', 'error');
             return;
@@ -193,12 +208,13 @@
             const resp = await fetch('/api/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password, action: 'setKey', key, status })
+                body: JSON.stringify({ password, action: 'setKey', key, status, oneTime })
             });
             const data = await resp.json();
             if (data.success) {
-                showMessage(`Key ${key} created with status ${status}`, 'success');
+                showMessage(`Key ${key} created with status ${status}, one-time: ${oneTime}`, 'success');
                 document.getElementById('newKey').value = '';
+                document.getElementById('oneTimeCheck').checked = false;
                 refreshKeys();
             } else {
                 showMessage('Error: ' + (data.error || 'Unknown'), 'error');
