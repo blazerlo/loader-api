@@ -1,9 +1,22 @@
 import { Redis } from '@upstash/redis';
 
-const redis = Redis.fromEnv();
+const redis = new Redis({
+  url: process.env.storage_KV_REST_API_URL || process.env.storage_REDIS_URL,
+  token: process.env.storage_KV_REST_API_TOKEN,
+});
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
+  // Разрешаем CORS для вашего фронтенда (если он на другом домене)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -16,6 +29,18 @@ export default async function handler(req, res) {
 
   try {
     switch (action) {
+      case 'listKeys': {
+        // Получаем все ключи, начинающиеся с "key:"
+        const keys = await redis.keys('key:*');
+        const result = [];
+        for (const k of keys) {
+          const statusValue = await redis.get(k);
+          const keyName = k.replace('key:', '');
+          result.push({ key: keyName, status: statusValue });
+        }
+        return res.json({ success: true, keys: result });
+      }
+
       case 'setKey':
         if (!key || !['link', 'unlink'].includes(status)) {
           return res.status(400).json({ error: 'Invalid key or status' });
@@ -37,21 +62,11 @@ export default async function handler(req, res) {
         const currentCode = await redis.get('script:code');
         return res.json({ success: true, code: currentCode });
 
-      case 'listKeys':
-        const keys = await redis.keys('key:*');
-        const result = [];
-        for (const k of keys) {
-          const s = await redis.get(k);
-          const keyName = k.replace('key:', '');
-          result.push({ key: keyName, status: s });
-        }
-        return res.json({ success: true, keys: result });
-
       default:
         return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (error) {
     console.error('Admin error:', error);
-    return res.status(500).json({ error: 'Internal error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
