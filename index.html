@@ -5,7 +5,7 @@
     <title>Key Manager</title>
     <style>
         body { font-family: Arial; background: #1a1a1a; color: #eee; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
+        .container { max-width: 1100px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
         input, button, textarea { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
         button { background: #6c5ce7; color: #fff; cursor: pointer; }
         button.danger { background: #e74c3c; }
@@ -30,15 +30,10 @@
         .success-msg { color: #2ecc71; }
         textarea { width: 100%; height: 150px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
         .code-section { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
-        .hwid-input { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .hwid-input input { flex: 1; min-width: 200px; }
-        .double-section { display: flex; gap: 20px; flex-wrap: wrap; }
-        .double-section .section { flex: 1; min-width: 300px; }
-        .double-section .section textarea { height: 200px; }
-        .loader-hint { background: #1a1a1a; padding: 10px; border-radius: 5px; margin-top: 10px; font-family: monospace; font-size: 12px; color: #888; }
-        .loader-hint code { color: #2ecc71; }
         .one-time-check { display: flex; align-items: center; gap: 10px; margin: 5px; }
         .one-time-check input[type="checkbox"] { width: 18px; height: 18px; }
+        .loader-hint { background: #1a1a1a; padding: 10px; border-radius: 5px; margin-top: 10px; font-family: monospace; font-size: 12px; color: #888; }
+        .loader-hint code { color: #2ecc71; }
     </style>
 </head>
 <body>
@@ -73,7 +68,7 @@
 
         <table>
             <thead>
-                <tr><th>Key</th><th>Status</th><th>HWID</th><th>MAC</th><th>One-Time</th><th>Used</th><th>Action</th></tr>
+                <tr><th>Key</th><th>Status</th><th>HWID</th><th>Fingerprint</th><th>One-Time</th><th>Used</th><th>Action</th></tr>
             </thead>
             <tbody id="keysTable"></tbody>
         </table>
@@ -87,7 +82,6 @@
             <button class="success" onclick="saveLoader()">💾 Save Loader</button>
             <button onclick="loadLoader()">📂 Load Current Loader</button>
             <span id="loaderMessage" style="margin-left: 10px;"></span>
-            
             <div class="loader-hint">
                 <strong>Как использовать в Roblox:</strong>
                 <code>loadstring(game:HttpGet("https://loader-dusky-alpha.vercel.app/api/getLoader"))()</code>
@@ -172,7 +166,7 @@
             const statusText = item.used ? 'used' : (item.status || 'unlink');
             const hwidDisplay = item.hwid || 'Not bound';
             const hwidClass = item.hwid ? 'hwid-bound' : 'hwid-unbound';
-            const macDisplay = item.mac || 'Not bound';
+            const fingerprintDisplay = item.fingerprint || 'Not bound';
             const oneTimeDisplay = item.oneTime ? '✅' : '❌';
             const usedDisplay = item.used ? '✅' : '❌';
             tr.innerHTML = `
@@ -182,7 +176,7 @@
                     <span class="hwid-status ${hwidClass}"></span>
                     <span style="font-family: monospace; font-size: 12px;">${hwidDisplay}</span>
                 </td>
-                <td style="font-family: monospace; font-size: 12px;">${macDisplay}</td>
+                <td style="font-family: monospace; font-size: 12px;">${fingerprintDisplay}</td>
                 <td>${oneTimeDisplay}</td>
                 <td>${usedDisplay}</td>
                 <td>
