@@ -5,6 +5,8 @@ const redis = new Redis({
   token: process.env.storage_KV_REST_API_TOKEN,
 });
 
+const SESSION_TTL = 60; // секунд
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).send('Method not allowed');
@@ -21,39 +23,54 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Получаем данные ключа
     const data = await redis.get(`key:${key}`);
 
     if (!data || data.status !== 'link') {
       return res.status(403).send('Invalid or unlinked key');
     }
 
-    // ⚠️ ПРОВЕРКА НА ИСПОЛЬЗОВАННЫЙ КЛЮЧ
-    if (data.used === true) {
+    if (data.used) {
       return res.status(403).send('Key already used');
     }
 
+    // Проверяем, не активен ли ключ уже
+    const isActive = await redis.get(`active:${key}`);
+    if (isActive) {
+      return res.status(403).send('Key already in use');
+    }
+
+    // Проверяем HWID и MAC (если привязаны)
     if (data.hwid && data.hwid !== hwid) {
       return res.status(403).send('HWID unauthorized');
     }
-
-    if (data.mac && mac && mac !== "" && data.mac !== mac) {
+    if (data.mac && mac && data.mac !== mac) {
       return res.status(403).send('MAC unauthorized');
     }
 
+    // Если HWID или MAC не привязаны – привязываем
     if (!data.hwid) data.hwid = hwid;
-    if (!data.mac && mac && mac !== "") data.mac = mac;
+    if (mac && !data.mac) data.mac = mac;
 
+    // Если ключ одноразовый – помечаем как used
+    if (data.oneTime) {
+      data.used = true;
+      // Сохраняем привязки и used
+      await redis.set(`key:${key}`, data);
+      // Не удаляем сразу, чтобы heartbeat не мог продлить, но ключ уже не будет работать
+    } else {
+      // Сохраняем привязки
+      await redis.set(`key:${key}`, data);
+    }
+
+    // Устанавливаем активную сессию с TTL
+    await redis.set(`active:${key}`, '1', { ex: SESSION_TTL });
+
+    // Получаем код
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
       return res.status(404).send('Script code not found');
     }
-
-    // ⚠️ ПОМЕЧАЕМ КЛЮЧ КАК ИСПОЛЬЗОВАННЫЙ, ЕСЛИ ОН ОДНОРАЗОВЫЙ
-    if (data.oneTime === true) {
-      data.used = true;
-    }
-
-    await redis.set(`key:${key}`, data);
 
     res.setHeader('Content-Type', 'text/plain');
     return res.send(scriptCode);
