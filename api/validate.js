@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).send('Method not allowed');
   }
 
-  const { key, hwid, mac } = req.query;
+  const { key, hwid, fingerprint } = req.query;
 
   if (!key || typeof key !== 'string') {
     return res.status(400).send('Key is required');
@@ -22,55 +22,63 @@ export default async function handler(req, res) {
     return res.status(400).send('HWID is required');
   }
 
+  if (!fingerprint || typeof fingerprint !== 'string') {
+    return res.status(400).send('Fingerprint is required');
+  }
+
   try {
-    // Получаем данные ключа
     const data = await redis.get(`key:${key}`);
 
     if (!data || data.status !== 'link') {
       return res.status(403).send('Invalid or unlinked key');
     }
 
-    if (data.used) {
+    // Проверка на использованный (одноразовый)
+    if (data.used === true) {
       return res.status(403).send('Key already used');
     }
 
-    // Проверяем, не активен ли ключ уже
-    const isActive = await redis.get(`active:${key}`);
-    if (isActive) {
-      return res.status(403).send('Key already in use');
+    // Проверка активной сессии (один игрок одновременно)
+    const sessionKey = `active:${key}`;
+    const activeSession = await redis.get(sessionKey);
+    if (activeSession) {
+      // Если активная сессия есть, но это тот же hwid+fingerprint – пропускаем
+      const sessionData = JSON.parse(activeSession);
+      if (sessionData.hwid !== hwid || sessionData.fingerprint !== fingerprint) {
+        return res.status(403).send('Key already in use');
+      }
+      // Если совпадает – обновляем TTL
+      await redis.expire(sessionKey, SESSION_TTL);
     }
 
-    // Проверяем HWID и MAC (если привязаны)
-    if (data.hwid && data.hwid !== hwid) {
+    // Привязываем HWID и fingerprint, если ещё не привязаны
+    if (!data.hwid) data.hwid = hwid;
+    if (!data.fingerprint) data.fingerprint = fingerprint;
+
+    // Если HWID или fingerprint не совпадают – кик
+    if (data.hwid !== hwid) {
       return res.status(403).send('HWID unauthorized');
     }
-    if (data.mac && mac && data.mac !== mac) {
-      return res.status(403).send('MAC unauthorized');
+    if (data.fingerprint !== fingerprint) {
+      return res.status(403).send('Fingerprint unauthorized');
     }
 
-    // Если HWID или MAC не привязаны – привязываем
-    if (!data.hwid) data.hwid = hwid;
-    if (mac && !data.mac) data.mac = mac;
-
-    // Если ключ одноразовый – помечаем как used
-    if (data.oneTime) {
-      data.used = true;
-      // Сохраняем привязки и used
-      await redis.set(`key:${key}`, data);
-      // Не удаляем сразу, чтобы heartbeat не мог продлить, но ключ уже не будет работать
-    } else {
-      // Сохраняем привязки
-      await redis.set(`key:${key}`, data);
-    }
-
-    // Устанавливаем активную сессию с TTL
-    await redis.set(`active:${key}`, '1', { ex: SESSION_TTL });
-
-    // Получаем код
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
       return res.status(404).send('Script code not found');
     }
+
+    // Если ключ одноразовый – помечаем used
+    if (data.oneTime === true) {
+      data.used = true;
+      await redis.set(`key:${key}`, data);
+    } else {
+      // Сохраняем привязки (если они поменялись)
+      await redis.set(`key:${key}`, data);
+    }
+
+    // Устанавливаем активную сессию
+    await redis.set(sessionKey, JSON.stringify({ hwid, fingerprint }), { ex: SESSION_TTL });
 
     res.setHeader('Content-Type', 'text/plain');
     return res.send(scriptCode);
