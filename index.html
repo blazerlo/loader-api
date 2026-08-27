@@ -5,7 +5,7 @@
     <title>Key Manager</title>
     <style>
         body { font-family: Arial; background: #1a1a1a; color: #eee; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
+        .container { max-width: 1000px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
         input, button, textarea { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
         button { background: #6c5ce7; color: #fff; cursor: pointer; }
         button.danger { background: #e74c3c; }
@@ -19,6 +19,10 @@
         .success-msg { color: #2ecc71; }
         textarea { width: 100%; height: 200px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
         .code-section { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
+        .hwid-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .hwid-linked { background: #2ecc71; }
+        .hwid-unlinked { background: #e74c3c; }
+        .hwid-cell { display: flex; align-items: center; }
     </style>
 </head>
 <body>
@@ -51,7 +55,7 @@
 
         <table>
             <thead>
-                <tr><th>Key</th><th>Status</th><th>Action</th></tr>
+                <tr><th>Key</th><th>Status</th><th>HWID</th><th>Action</th></tr>
             </thead>
             <tbody id="keysTable"></tbody>
         </table>
@@ -59,7 +63,7 @@
         <!-- Блок для загрузки кода -->
         <div class="code-section">
             <h3>📄 Script Code</h3>
-            <p>Paste your Lua script here and click Save Code. This code will be returned when a valid key is used.</p>
+            <p>Paste your Lua script here and click Save Code. This code will be returned when a valid key and HWID are provided.</p>
             <textarea id="scriptCode" placeholder="-- Paste your script here"></textarea>
             <br>
             <button class="success" onclick="saveCode()">💾 Save Code</button>
@@ -84,7 +88,7 @@
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('panel').style.display = 'block';
                 document.getElementById('loginError').innerText = '';
-                loadCode(); // загружаем текущий код при входе
+                loadCode();
             } else {
                 document.getElementById('loginError').innerText = 'Wrong password or server error';
             }
@@ -124,18 +128,28 @@
         const table = document.getElementById('keysTable');
         table.innerHTML = '';
         if (!keys || keys.length === 0) {
-            table.innerHTML = '<tr><td colspan="3">No keys found</td></tr>';
+            table.innerHTML = '<tr><td colspan="4">No keys found</td></tr>';
             return;
         }
         keys.forEach(item => {
             const tr = document.createElement('tr');
             const statusClass = item.status === 'link' ? 'link' : 'unlink';
+            const hwidLinked = item.hwid && item.hwid.length > 0;
+            const hwidIndicator = hwidLinked ? '🟢' : '🔴'; // цветные кружки
+            const hwidDisplay = item.hwid || '—';
             tr.innerHTML = `
                 <td><code>${item.key}</code></td>
                 <td><span class="status-badge ${statusClass}">${item.status || 'unlink'}</span></td>
                 <td>
+                    <span class="hwid-cell">
+                        <span class="hwid-indicator ${hwidLinked ? 'hwid-linked' : 'hwid-unlinked'}"></span>
+                        ${hwidDisplay}
+                    </span>
+                </td>
+                <td>
                     <button class="danger" onclick="deleteKey('${item.key}')">🗑️</button>
                     <button onclick="toggleStatus('${item.key}', '${item.status}')">🔄 Toggle</button>
+                    <button onclick="setHwidPrompt('${item.key}')">🔗 Set HWID</button>
                 </td>
             `;
             table.appendChild(tr);
@@ -199,6 +213,31 @@
             const data = await resp.json();
             if (data.success) {
                 showMessage(`Key ${key} set to ${newStatus}`, 'success');
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function setHwidPrompt(key) {
+        const hwid = prompt(`Enter HWID for key "${key}":`);
+        if (hwid === null) return; // отмена
+        if (!hwid.trim()) {
+            showMessage('HWID cannot be empty', 'error');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setHwid', key, hwid: hwid.trim() })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`HWID set for key ${key}`, 'success');
                 refreshKeys();
             } else {
                 showMessage('Error: ' + (data.error || 'Unknown'), 'error');
