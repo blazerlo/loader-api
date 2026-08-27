@@ -5,7 +5,7 @@
     <title>Key Manager</title>
     <style>
         body { font-family: Arial; background: #1a1a1a; color: #eee; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
+        .container { max-width: 1000px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
         input, button, textarea { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
         button { background: #6c5ce7; color: #fff; cursor: pointer; }
         button.danger { background: #e74c3c; }
@@ -68,7 +68,7 @@
 
         <table>
             <thead>
-                <tr><th>Key</th><th>Status</th><th>HWID</th><th>Fingerprint</th><th>One-Time</th><th>Used</th><th>Action</th></tr>
+                <tr><th>Key</th><th>Status</th><th>HWID</th><th>One-Time</th><th>Used</th><th>Action</th></tr>
             </thead>
             <tbody id="keysTable"></tbody>
         </table>
@@ -157,7 +157,7 @@
         const table = document.getElementById('keysTable');
         table.innerHTML = '';
         if (!keys || keys.length === 0) {
-            table.innerHTML = '<tr><td colspan="7">No keys found</td></tr>';
+            table.innerHTML = '<tr><td colspan="6">No keys found</td></tr>';
             return;
         }
         keys.forEach(item => {
@@ -166,7 +166,6 @@
             const statusText = item.used ? 'used' : (item.status || 'unlink');
             const hwidDisplay = item.hwid || 'Not bound';
             const hwidClass = item.hwid ? 'hwid-bound' : 'hwid-unbound';
-            const fingerprintDisplay = item.fingerprint || 'Not bound';
             const oneTimeDisplay = item.oneTime ? '✅' : '❌';
             const usedDisplay = item.used ? '✅' : '❌';
             tr.innerHTML = `
@@ -176,7 +175,6 @@
                     <span class="hwid-status ${hwidClass}"></span>
                     <span style="font-family: monospace; font-size: 12px;">${hwidDisplay}</span>
                 </td>
-                <td style="font-family: monospace; font-size: 12px;">${fingerprintDisplay}</td>
                 <td>${oneTimeDisplay}</td>
                 <td>${usedDisplay}</td>
                 <td>
