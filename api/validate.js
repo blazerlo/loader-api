@@ -27,11 +27,16 @@ export default async function handler(req, res) {
       return res.status(403).send('Invalid or unlinked key');
     }
 
-    // Если к ключу привязан HWID – проверяем
-    if (data.hwid && data.hwid !== hwid) {
+    // Если HWID не привязан – привязываем автоматически
+    if (!data.hwid) {
+      await redis.set(`key:${key}`, { status: 'link', hwid });
+      // После привязки продолжаем выполнение
+    } else if (data.hwid !== hwid) {
+      // Если HWID привязан и не совпадает – запрещаем
       return res.status(403).send('HWID unauthorized');
     }
 
+    // Если HWID совпадает или только что привязан – выдаём код
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
       return res.status(404).send('Script code not found');
