@@ -23,14 +23,19 @@
             border-radius: 50%;
             margin-right: 6px;
         }
-        .hwid-bound { background: #2ecc71; }  /* Зелёный */
-        .hwid-unbound { background: #e74c3c; } /* Красный */
+        .hwid-bound { background: #2ecc71; }
+        .hwid-unbound { background: #e74c3c; }
         .error { color: #e74c3c; }
         .success-msg { color: #2ecc71; }
-        textarea { width: 100%; height: 200px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
+        textarea { width: 100%; height: 150px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
         .code-section { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
         .hwid-input { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .hwid-input input { flex: 1; min-width: 200px; }
+        .double-section { display: flex; gap: 20px; flex-wrap: wrap; }
+        .double-section .section { flex: 1; min-width: 300px; }
+        .double-section .section textarea { height: 200px; }
+        .loader-hint { background: #1a1a1a; padding: 10px; border-radius: 5px; margin-top: 10px; font-family: monospace; font-size: 12px; color: #888; }
+        .loader-hint code { color: #2ecc71; }
     </style>
 </head>
 <body>
@@ -66,14 +71,29 @@
             <tbody id="keysTable"></tbody>
         </table>
 
-        <!-- Блок для загрузки кода -->
+        <!-- Два текстовых поля -->
+        <div class="code-section">
+            <h3>📄 Loader Code</h3>
+            <p>Код загрузчика (выполняется через <code>game:HttpGet("/api/getLoader")</code>)</p>
+            <textarea id="loaderCode" placeholder="-- Paste your loader code here"></textarea>
+            <br>
+            <button class="success" onclick="saveLoader()">💾 Save Loader</button>
+            <button onclick="loadLoader()">📂 Load Current Loader</button>
+            <span id="loaderMessage" style="margin-left: 10px;"></span>
+            
+            <div class="loader-hint">
+                <strong>Как использовать в Roblox:</strong>
+                <code>loadstring(game:HttpGet("https://loader-dusky-alpha.vercel.app/api/getLoader"))()</code>
+            </div>
+        </div>
+
         <div class="code-section">
             <h3>📄 Script Code</h3>
-            <p>Paste your Lua script here and click Save Code.</p>
+            <p>Основной скрипт (выполняется после проверки ключа и HWID)</p>
             <textarea id="scriptCode" placeholder="-- Paste your script here"></textarea>
             <br>
-            <button class="success" onclick="saveCode()">💾 Save Code</button>
-            <button onclick="loadCode()">📂 Load Current Code</button>
+            <button class="success" onclick="saveCode()">💾 Save Script</button>
+            <button onclick="loadCode()">📂 Load Current Script</button>
             <span id="codeMessage" style="margin-left: 10px;"></span>
         </div>
     </div>
@@ -94,6 +114,7 @@
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('panel').style.display = 'block';
                 document.getElementById('loginError').innerText = '';
+                loadLoader();
                 loadCode();
             } else {
                 document.getElementById('loginError').innerText = 'Wrong password or server error';
@@ -107,6 +128,7 @@
         password = '';
         document.getElementById('adminPassword').value = '';
         document.getElementById('keysTable').innerHTML = '';
+        document.getElementById('loaderCode').value = '';
         document.getElementById('scriptCode').value = '';
     }
 
@@ -271,11 +293,56 @@
         fetchKeys(false);
     }
 
-    // ---------- CODE MANAGEMENT ----------
+    // ---------- LOADER MANAGEMENT ----------
+    async function saveLoader() {
+        const loader = document.getElementById('loaderCode').value;
+        if (!loader.trim()) {
+            showMessage('Loader code cannot be empty', 'error');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setLoader', loader })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage('Loader code saved successfully!', 'success');
+                document.getElementById('loaderMessage').innerHTML = '<span style="color: #2ecc71;">✅ Saved</span>';
+            } else {
+                showMessage('Error saving loader: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function loadLoader() {
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'getLoader' })
+            });
+            const data = await resp.json();
+            if (data.success && data.loader !== undefined && data.loader !== null) {
+                document.getElementById('loaderCode').value = data.loader;
+                document.getElementById('loaderMessage').innerHTML = '<span style="color: #3498db;">📥 Loaded</span>';
+            } else {
+                document.getElementById('loaderCode').value = '';
+                document.getElementById('loaderMessage').innerHTML = '<span style="color: #e67e22;">⚠️ No loader code found</span>';
+            }
+        } catch (e) {
+            document.getElementById('loaderMessage').innerHTML = '<span style="color: #e74c3c;">❌ Error loading</span>';
+        }
+    }
+
+    // ---------- SCRIPT CODE MANAGEMENT ----------
     async function saveCode() {
         const code = document.getElementById('scriptCode').value;
         if (!code.trim()) {
-            showMessage('Code cannot be empty', 'error');
+            showMessage('Script code cannot be empty', 'error');
             return;
         }
         try {
@@ -286,10 +353,10 @@
             });
             const data = await resp.json();
             if (data.success) {
-                showMessage('Code saved successfully!', 'success');
+                showMessage('Script code saved successfully!', 'success');
                 document.getElementById('codeMessage').innerHTML = '<span style="color: #2ecc71;">✅ Saved</span>';
             } else {
-                showMessage('Error saving code: ' + (data.error || 'Unknown'), 'error');
+                showMessage('Error saving script: ' + (data.error || 'Unknown'), 'error');
             }
         } catch (e) {
             showMessage('Error: ' + e.message, 'error');
@@ -309,7 +376,7 @@
                 document.getElementById('codeMessage').innerHTML = '<span style="color: #3498db;">📥 Loaded</span>';
             } else {
                 document.getElementById('scriptCode').value = '';
-                document.getElementById('codeMessage').innerHTML = '<span style="color: #e67e22;">⚠️ No code found</span>';
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #e67e22;">⚠️ No script code found</span>';
             }
         } catch (e) {
             document.getElementById('codeMessage').innerHTML = '<span style="color: #e74c3c;">❌ Error loading</span>';
