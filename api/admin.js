@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password, action, key, status, code, hwid } = req.body;
+  const { password, action, key, status, code, loader } = req.body;
 
   if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -57,6 +57,17 @@ export default async function handler(req, res) {
         if (!key) return res.status(400).json({ error: 'Key required' });
         await redis.del(`key:${key}`);
         return res.json({ success: true, message: `Key ${key} deleted` });
+      }
+
+      case 'setLoader': {
+        if (!loader) return res.status(400).json({ error: 'Loader code required' });
+        await redis.set('loader:code', loader);
+        return res.json({ success: true, message: 'Loader code updated' });
+      }
+
+      case 'getLoader': {
+        const currentLoader = await redis.get('loader:code');
+        return res.json({ success: true, loader: currentLoader });
       }
 
       case 'setCode': {
