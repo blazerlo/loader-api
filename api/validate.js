@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const redis = Redis.fromEnv();
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -12,10 +14,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const status = await kv.get(`key:${key}`);
+    const status = await redis.get(`key:${key}`);
 
     if (status === 'link') {
-      const scriptCode = await kv.get('script:code');
+      const scriptCode = await redis.get('script:code');
       if (!scriptCode) {
         return res.status(404).send('Script code not found');
       }
@@ -25,7 +27,7 @@ export default async function handler(req, res) {
       return res.status(403).send('Invalid or unlinked key');
     }
   } catch (error) {
-    console.error('KV Error:', error);
+    console.error('Redis Error:', error);
     return res.status(500).send('Internal server error');
   }
 }
