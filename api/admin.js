@@ -8,7 +8,6 @@ const redis = new Redis({
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
-  // Разрешаем CORS для админ-панели (если она на другом домене)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password, action, key, status, code } = req.body;
+  const { password, action, key, status, code, hwid } = req.body;
 
   if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -33,9 +32,10 @@ export default async function handler(req, res) {
         const keys = await redis.keys('key:*');
         const result = [];
         for (const k of keys) {
-          const statusValue = await redis.get(k);
           const keyName = k.replace('key:', '');
-          result.push({ key: keyName, status: statusValue });
+          const statusValue = await redis.get(k);
+          const hwidValue = await redis.get(`hwid:${keyName}`);
+          result.push({ key: keyName, status: statusValue, hwid: hwidValue || null });
         }
         return res.json({ success: true, keys: result });
       }
@@ -45,11 +45,16 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Invalid key or status' });
         }
         await redis.set(`key:${key}`, status);
+        // Если передан hwid, то сохраняем его
+        if (hwid) {
+          await redis.set(`hwid:${key}`, hwid);
+        }
         return res.json({ success: true, message: `Key ${key} set to ${status}` });
 
       case 'deleteKey':
         if (!key) return res.status(400).json({ error: 'Key required' });
         await redis.del(`key:${key}`);
+        await redis.del(`hwid:${key}`);
         return res.json({ success: true, message: `Key ${key} deleted` });
 
       case 'setCode':
@@ -60,6 +65,11 @@ export default async function handler(req, res) {
       case 'getCode':
         const currentCode = await redis.get('script:code');
         return res.json({ success: true, code: currentCode });
+
+      case 'setHwid':
+        if (!key || !hwid) return res.status(400).json({ error: 'Key and HWID required' });
+        await redis.set(`hwid:${key}`, hwid);
+        return res.json({ success: true, message: `HWID set for key ${key}` });
 
       default:
         return res.status(400).json({ error: 'Invalid action' });
