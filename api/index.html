@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель ключей</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .login-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .login-box input[type="password"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex: 1;
+        }
+        .login-box button {
+            padding: 10px 20px;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .login-box button:hover { background: #0051a2; }
+        .error { color: red; }
+        .success { color: green; }
+        .key-list {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .key-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .key-item:last-child { border-bottom: none; }
+        .key-name {
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .status-link { color: #28a745; }
+        .status-unlink { color: #dc3545; }
+        .btn {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #b02a37; }
+        .btn-add {
+            background: #28a745;
+            padding: 8px 16px;
+        }
+        .btn-add:hover { background: #1e7e34; }
+        .form-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .form-group input, .form-group select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-group button { padding: 8px 16px; }
+        #status-message {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🔑 Управление ключами</h1>
+
+    <div class="login-box" id="loginBox">
+        <input type="password" id="passwordInput" placeholder="Введите пароль администратора">
+        <button id="loginBtn">Войти</button>
+        <span id="loginError" class="error"></span>
+    </div>
+
+    <div id="adminPanel" style="display: none;">
+        <div id="status-message"></div>
+
+        <div class="key-list">
+            <h2>Все ключи</h2>
+            <div id="keysContainer">Загрузка...</div>
+        </div>
+
+        <div style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+            <h3>Добавить новый ключ</h3>
+            <div class="form-group">
+                <input type="text" id="newKeyInput" placeholder="Введите ключ">
+                <select id="newStatusSelect">
+                    <option value="link">link</option>
+                    <option value="unlink">unlink</option>
+                </select>
+                <button class="btn btn-add" id="addKeyBtn">Добавить</button>
+            </div>
+        </div>
+
+        <div style="margin-top:20px;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+            <h3>Обновить код скрипта</h3>
+            <textarea id="codeTextarea" rows="6" style="width:100%;padding:8px;font-family:monospace;" placeholder="Введите код скрипта"></textarea>
+            <button class="btn btn-add" id="updateCodeBtn">Обновить код</button>
+            <div id="codeStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        let password = '';
+        const API_BASE = ''; // относительный путь
+
+        const loginBox = document.getElementById('loginBox');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginError = document.getElementById('loginError');
+        const adminPanel = document.getElementById('adminPanel');
+        const keysContainer = document.getElementById('keysContainer');
+        const statusMessage = document.getElementById('status-message');
+        const newKeyInput = document.getElementById('newKeyInput');
+        const newStatusSelect = document.getElementById('newStatusSelect');
+        const addKeyBtn = document.getElementById('addKeyBtn');
+        const codeTextarea = document.getElementById('codeTextarea');
+        const updateCodeBtn = document.getElementById('updateCodeBtn');
+        const codeStatus = document.getElementById('codeStatus');
+
+        function showMessage(msg, isError = false) {
+            statusMessage.textContent = msg;
+            statusMessage.style.color = isError ? 'red' : 'green';
+            setTimeout(() => { statusMessage.textContent = ''; }, 5000);
+        }
+
+        async function callAdmin(action, payload = {}) {
+            const body = { password, action, ...payload };
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`HTTP ${response.status}: ${text}`);
+            }
+            return response.json();
+        }
+
+        async function loadKeys() {
+            try {
+                const data = await callAdmin('listKeys');
+                if (data.success && data.keys) {
+                    renderKeys(data.keys);
+                } else {
+                    keysContainer.innerHTML = 'Ошибка загрузки ключей.';
+                }
+            } catch (err) {
+                keysContainer.innerHTML = 'Ошибка: ' + err.message;
+            }
+        }
+
+        function renderKeys(keys) {
+            if (keys.length === 0) {
+                keysContainer.innerHTML = '<p>Нет ключей.</p>';
+                return;
+            }
+            let html = '';
+            keys.forEach(item => {
+                const statusClass = item.status === 'link' ? 'status-link' : 'status-unlink';
+                html += `
+                    <div class="key-item">
+                        <span class="key-name">${item.key}</span>
+                        <span class="${statusClass}">${item.status}</span>
+                        <button class="btn btn-delete" data-key="${item.key}">Удалить</button>
+                    </div>
+                `;
+            });
+            keysContainer.innerHTML = html;
+
+            // Привязываем обработчики удаления
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const key = this.dataset.key;
+                    if (!confirm(`Удалить ключ "${key}"?`)) return;
+                    try {
+                        const data = await callAdmin('deleteKey', { key });
+                        if (data.success) {
+                            showMessage(`Ключ "${key}" удалён.`);
+                            loadKeys();
+                        } else {
+                            showMessage('Ошибка удаления: ' + data.message, true);
+                        }
+                    } catch (err) {
+                        showMessage('Ошибка: ' + err.message, true);
+                    }
+                });
+            });
+        }
+
+        async function addKey() {
+            const key = newKeyInput.value.trim();
+            const status = newStatusSelect.value;
+            if (!key) {
+                showMessage('Введите ключ.', true);
+                return;
+            }
+            try {
+                const data = await callAdmin('setKey', { key, status });
+                if (data.success) {
+                    showMessage(`Ключ "${key}" добавлен со статусом ${status}.`);
+                    newKeyInput.value = '';
+                    loadKeys();
+                } else {
+                    showMessage('Ошибка: ' + data.message, true);
+                }
+            } catch (err) {
+                showMessage('Ошибка: ' + err.message, true);
+            }
+        }
+
+        async function updateCode() {
+            const code = codeTextarea.value;
+            if (!code) {
+                showMessage('Введите код.', true);
+                return;
+            }
+            try {
+                const data = await callAdmin('setCode', { code });
+                if (data.success) {
+                    showMessage('Код обновлён.');
+                    codeStatus.textContent = '✅ Код сохранён.';
+                } else {
+                    showMessage('Ошибка: ' + data.message, true);
+                }
+            } catch (err) {
+                showMessage('Ошибка: ' + err.message, true);
+            }
+        }
+
+        // Загрузка текущего кода для отображения
+        async function loadCurrentCode() {
+            try {
+                const data = await callAdmin('getCode');
+                if (data.success && data.code !== undefined) {
+                    codeTextarea.value = data.code || '';
+                }
+            } catch (err) {
+                // игнорируем, если не удалось загрузить
+            }
+        }
+
+        // Обработка входа
+        loginBtn.addEventListener('click', async function() {
+            const pwd = passwordInput.value.trim();
+            if (!pwd) {
+                loginError.textContent = 'Введите пароль.';
+                return;
+            }
+            // Попробуем выполнить любой запрос с этим паролем (например, listKeys)
+            try {
+                const test = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd, action: 'listKeys' })
+                });
+                if (test.status === 401) {
+                    loginError.textContent = 'Неверный пароль.';
+                    return;
+                }
+                if (!test.ok) {
+                    loginError.textContent = 'Ошибка сервера: ' + test.status;
+                    return;
+                }
+                // Пароль верный
+                password = pwd;
+                loginError.textContent = '';
+                loginBox.style.display = 'none';
+                adminPanel.style.display = 'block';
+                // Загружаем ключи и код
+                await loadKeys();
+                await loadCurrentCode();
+
+                // Назначаем обработчики для кнопок
+                addKeyBtn.addEventListener('click', addKey);
+                updateCodeBtn.addEventListener('click', updateCode);
+
+            } catch (err) {
+                loginError.textContent = 'Ошибка соединения: ' + err.message;
+            }
+        });
+
+        // Нажатие Enter в поле пароля
+        passwordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') loginBtn.click();
+        });
+    </script>
+
+</body>
+</html>
