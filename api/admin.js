@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password, action, key, status, code, loader, hwid, oneTime, fingerprint } = req.body;
+  const { password, action, key, status, code, loader, hwid, oneTime } = req.body;
 
   if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -38,7 +38,6 @@ export default async function handler(req, res) {
             key: keyName,
             status: data?.status || 'unlink',
             hwid: data?.hwid || null,
-            fingerprint: data?.fingerprint || null,
             oneTime: data?.oneTime || false,
             used: data?.used || false
           });
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
         }
         const data = { status };
         if (hwid !== undefined) data.hwid = hwid;
-        if (fingerprint !== undefined) data.fingerprint = fingerprint;
         if (oneTime !== undefined) data.oneTime = oneTime;
         data.used = false;
         await redis.set(`key:${key}`, data);
