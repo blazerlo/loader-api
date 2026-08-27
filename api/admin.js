@@ -1,11 +1,6 @@
 import { Redis } from '@upstash/redis';
 
-// Создаём клиент, используя переменные с префиксом storage_
-const redis = new Redis({
-  url: process.env.storage_KV_REST_API_URL || process.env.storage_REDIS_URL,
-  token: process.env.storage_KV_REST_API_TOKEN,
-});
-
+const redis = Redis.fromEnv();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
@@ -41,6 +36,16 @@ export default async function handler(req, res) {
       case 'getCode':
         const currentCode = await redis.get('script:code');
         return res.json({ success: true, code: currentCode });
+
+      case 'listKeys':
+        const keys = await redis.keys('key:*');
+        const result = [];
+        for (const k of keys) {
+          const s = await redis.get(k);
+          const keyName = k.replace('key:', '');
+          result.push({ key: keyName, status: s });
+        }
+        return res.json({ success: true, keys: result });
 
       default:
         return res.status(400).json({ error: 'Invalid action' });
