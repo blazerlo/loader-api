@@ -1,6 +1,7 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_супер_пароль';
+const redis = Redis.fromEnv();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,21 +20,21 @@ export default async function handler(req, res) {
         if (!key || !['link', 'unlink'].includes(status)) {
           return res.status(400).json({ error: 'Invalid key or status' });
         }
-        await kv.set(`key:${key}`, status);
+        await redis.set(`key:${key}`, status);
         return res.json({ success: true, message: `Key ${key} set to ${status}` });
 
       case 'deleteKey':
         if (!key) return res.status(400).json({ error: 'Key required' });
-        await kv.del(`key:${key}`);
+        await redis.del(`key:${key}`);
         return res.json({ success: true, message: `Key ${key} deleted` });
 
       case 'setCode':
         if (!code) return res.status(400).json({ error: 'Code required' });
-        await kv.set('script:code', code);
+        await redis.set('script:code', code);
         return res.json({ success: true, message: 'Script code updated' });
 
       case 'getCode':
-        const currentCode = await kv.get('script:code');
+        const currentCode = await redis.get('script:code');
         return res.json({ success: true, code: currentCode });
 
       default:
