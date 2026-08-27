@@ -1,15 +1,15 @@
--- Функция получения HWID
+-- script.lua (загрузчик с проверкой HWID и ключа)
 local function getHWID()
-    -- Для большинства эксплойтов
+    -- Попытка получить HWID через различные методы для разных эксплойтов
     if syn and syn.get_hwid then
         return syn.get_hwid()
     elseif gethwid then
         return gethwid()
     elseif identifyexecutor and identifyexecutor() then
-        -- Для некоторых эксплойтов
+        -- Для некоторых эксплойтов, возвращаем ClientId как fallback
         return game:GetService("RbxAnalyticsService"):GetClientId()
     else
-        -- Fallback: используем ClientId
+        -- Универсальный fallback
         return game:GetService("RbxAnalyticsService"):GetClientId()
     end
 end
@@ -40,6 +40,6 @@ elseif result:match("Invalid or unlinked key") then
 elseif result:match("Script code not found") then
     error("Script code not found")
 else
-    -- Выполняем полученный код
+    -- Выполняем полученный код (основной скрипт)
     loadstring(result)()
 end
