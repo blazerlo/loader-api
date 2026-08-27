@@ -8,7 +8,7 @@ const redis = new Redis({
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ваш_пароль';
 
 export default async function handler(req, res) {
-  // Разрешаем CORS для вашего фронтенда (если он на другом домене)
+  // Разрешаем CORS для админ-панели (если она на другом домене)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -30,7 +30,6 @@ export default async function handler(req, res) {
   try {
     switch (action) {
       case 'listKeys': {
-        // Получаем все ключи, начинающиеся с "key:"
         const keys = await redis.keys('key:*');
         const result = [];
         for (const k of keys) {
