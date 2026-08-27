@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password, action, key, status, code, loader } = req.body;
+  const { password, action, key, status, code, loader, hwid } = req.body;
 
   if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
