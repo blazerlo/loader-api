@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return res.status(405).send('Method not allowed');
   }
 
-  const { key, hwid } = req.query;
+  const { key, hwid } = req.query; // <-- теперь передаём ещё и hwid
 
   if (!key || typeof key !== 'string') {
     return res.status(400).send('Key is required');
@@ -21,24 +21,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Проверяем статус ключа
-    const status = await redis.get(`key:${key}`);
-    if (status !== 'link') {
+    const data = await redis.get(`key:${key}`);
+
+    if (!data || data.status !== 'link') {
       return res.status(403).send('Invalid or unlinked key');
     }
 
-    // Проверяем привязанный HWID
-    const storedHwid = await redis.get(`hwid:${key}`);
-    if (!storedHwid) {
-      // Ключ ещё не привязан к HWID – привязываем
-      await redis.set(`hwid:${key}`, hwid);
-      // Обновляем статус ключа? Можно оставить link.
-    } else if (storedHwid !== hwid) {
-      // HWID не совпадает
-      return res.status(403).send('hwid unauthorized');
+    // Если к ключу привязан HWID – проверяем
+    if (data.hwid && data.hwid !== hwid) {
+      return res.status(403).send('HWID unauthorized');
     }
 
-    // Получаем код скрипта
+    // Если HWID не привязан – пропускаем (ключ ещё не привязан к устройству)
+    // Но можно сделать так, чтобы при первом использовании HWID автоматически привязывался:
+    // if (!data.hwid) {
+    //   await redis.set(`key:${key}`, { status: 'link', hwid });
+    // }
+
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
       return res.status(404).send('Script code not found');
