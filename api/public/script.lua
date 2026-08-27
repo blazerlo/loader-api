@@ -1,3 +1,4 @@
+-- script.lua (загрузчик с проверкой HWID и ключа)
 local function getHWID()
     if syn and syn.get_hwid then
         return syn.get_hwid()
