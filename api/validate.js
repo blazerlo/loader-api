@@ -10,25 +10,42 @@ export default async function handler(req, res) {
     return res.status(405).send('Method not allowed');
   }
 
-  const { key } = req.query;
+  const { key, hwid } = req.query;
 
   if (!key || typeof key !== 'string') {
     return res.status(400).send('Key is required');
   }
 
-  try {
-    const status = await redis.get(`key:${key}`);
+  if (!hwid || typeof hwid !== 'string') {
+    return res.status(400).send('HWID is required');
+  }
 
-    if (status === 'link') {
-      const scriptCode = await redis.get('script:code');
-      if (!scriptCode) {
-        return res.status(404).send('Script code not found');
-      }
-      res.setHeader('Content-Type', 'text/plain');
-      return res.send(scriptCode);
-    } else {
+  try {
+    // Проверяем статус ключа
+    const status = await redis.get(`key:${key}`);
+    if (status !== 'link') {
       return res.status(403).send('Invalid or unlinked key');
     }
+
+    // Проверяем привязанный HWID
+    const storedHwid = await redis.get(`hwid:${key}`);
+    if (!storedHwid) {
+      // Ключ ещё не привязан к HWID – привязываем
+      await redis.set(`hwid:${key}`, hwid);
+      // Обновляем статус ключа? Можно оставить link.
+    } else if (storedHwid !== hwid) {
+      // HWID не совпадает
+      return res.status(403).send('hwid unauthorized');
+    }
+
+    // Получаем код скрипта
+    const scriptCode = await redis.get('script:code');
+    if (!scriptCode) {
+      return res.status(404).send('Script code not found');
+    }
+
+    res.setHeader('Content-Type', 'text/plain');
+    return res.send(scriptCode);
   } catch (error) {
     console.error('Redis Error:', error);
     return res.status(500).send('Internal server error');
