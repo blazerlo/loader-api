@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return res.status(405).send('Method not allowed');
   }
 
-  const { key, hwid } = req.query; // <-- теперь передаём ещё и hwid
+  const { key, hwid } = req.query;
 
   if (!key || typeof key !== 'string') {
     return res.status(400).send('Key is required');
@@ -31,12 +31,6 @@ export default async function handler(req, res) {
     if (data.hwid && data.hwid !== hwid) {
       return res.status(403).send('HWID unauthorized');
     }
-
-    // Если HWID не привязан – пропускаем (ключ ещё не привязан к устройству)
-    // Но можно сделать так, чтобы при первом использовании HWID автоматически привязывался:
-    // if (!data.hwid) {
-    //   await redis.set(`key:${key}`, { status: 'link', hwid });
-    // }
 
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
