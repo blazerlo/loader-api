@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Key Manager</title>
+    <style>
+        body { font-family: Arial; background: #1a1a1a; color: #eee; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #2a2a2a; padding: 20px; border-radius: 10px; }
+        input, button, textarea { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
+        button { background: #6c5ce7; color: #fff; cursor: pointer; }
+        button.danger { background: #e74c3c; }
+        button.success { background: #27ae60; }
+        button.warning { background: #f39c12; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
+        .link { color: #2ecc71; font-weight: bold; }
+        .unlink { color: #e74c3c; font-weight: bold; }
+        .status-badge { padding: 2px 10px; border-radius: 20px; background: #333; }
+        .hwid-status {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .hwid-bound { background: #2ecc71; }  /* Зелёный */
+        .hwid-unbound { background: #e74c3c; } /* Красный */
+        .error { color: #e74c3c; }
+        .success-msg { color: #2ecc71; }
+        textarea { width: 100%; height: 200px; background: #1a1a1a; color: #eee; border: 1px solid #444; font-family: monospace; }
+        .code-section { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
+        .hwid-input { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .hwid-input input { flex: 1; min-width: 200px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔑 Key Manager</h1>
+
+    <div id="loginArea">
+        <label>Admin Password:</label>
+        <input type="password" id="adminPassword" placeholder="Enter password">
+        <button onclick="login()">Login</button>
+        <p id="loginError" class="error"></p>
+    </div>
+
+    <div id="panel" style="display:none;">
+        <!-- Управление ключами -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+            <input type="text" id="newKey" placeholder="New key">
+            <select id="newStatus">
+                <option value="link">link</option>
+                <option value="unlink">unlink</option>
+            </select>
+            <button class="success" onclick="createKey()">➕ Create</button>
+            <button onclick="refreshKeys()">🔄 Refresh</button>
+            <button class="danger" onclick="logout()">🚪 Logout</button>
+        </div>
+
+        <div id="message"></div>
+
+        <table>
+            <thead>
+                <tr><th>Key</th><th>Status</th><th>HWID</th><th>Action</th></tr>
+            </thead>
+            <tbody id="keysTable"></tbody>
+        </table>
+
+        <!-- Блок для загрузки кода -->
+        <div class="code-section">
+            <h3>📄 Script Code</h3>
+            <p>Paste your Lua script here and click Save Code.</p>
+            <textarea id="scriptCode" placeholder="-- Paste your script here"></textarea>
+            <br>
+            <button class="success" onclick="saveCode()">💾 Save Code</button>
+            <button onclick="loadCode()">📂 Load Current Code</button>
+            <span id="codeMessage" style="margin-left: 10px;"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    let password = '';
+
+    function login() {
+        const pwd = document.getElementById('adminPassword').value;
+        if (!pwd) {
+            document.getElementById('loginError').innerText = 'Enter password';
+            return;
+        }
+        password = pwd;
+        fetchKeys(true).then(success => {
+            if (success) {
+                document.getElementById('loginArea').style.display = 'none';
+                document.getElementById('panel').style.display = 'block';
+                document.getElementById('loginError').innerText = '';
+                loadCode();
+            } else {
+                document.getElementById('loginError').innerText = 'Wrong password or server error';
+            }
+        });
+    }
+
+    function logout() {
+        document.getElementById('panel').style.display = 'none';
+        document.getElementById('loginArea').style.display = 'block';
+        password = '';
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('keysTable').innerHTML = '';
+        document.getElementById('scriptCode').value = '';
+    }
+
+    async function fetchKeys(silent) {
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'listKeys' })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                if (!silent) showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+                return false;
+            }
+            renderKeys(data.keys);
+            return true;
+        } catch (e) {
+            if (!silent) showMessage('Error fetching keys: ' + e.message, 'error');
+            return false;
+        }
+    }
+
+    function renderKeys(keys) {
+        const table = document.getElementById('keysTable');
+        table.innerHTML = '';
+        if (!keys || keys.length === 0) {
+            table.innerHTML = '<tr><td colspan="4">No keys found</td></tr>';
+            return;
+        }
+        keys.forEach(item => {
+            const tr = document.createElement('tr');
+            const statusClass = item.status === 'link' ? 'link' : 'unlink';
+            const hwidDisplay = item.hwid || 'Not bound';
+            const hwidClass = item.hwid ? 'hwid-bound' : 'hwid-unbound';
+            tr.innerHTML = `
+                <td><code>${item.key}</code></td>
+                <td><span class="status-badge ${statusClass}">${item.status || 'unlink'}</span></td>
+                <td>
+                    <span class="hwid-status ${hwidClass}"></span>
+                    <span style="font-family: monospace; font-size: 12px;">${hwidDisplay}</span>
+                </td>
+                <td>
+                    <button class="danger" onclick="deleteKey('${item.key}')">🗑️</button>
+                    <button onclick="toggleStatus('${item.key}', '${item.status}')">🔄 Toggle</button>
+                    <button class="warning" onclick="bindHwid('${item.key}')">🔗 Bind HWID</button>
+                    <button class="danger" onclick="unbindHwid('${item.key}')">🔓 Unbind HWID</button>
+                </td>
+            `;
+            table.appendChild(tr);
+        });
+    }
+
+    async function createKey() {
+        const key = document.getElementById('newKey').value.trim();
+        const status = document.getElementById('newStatus').value;
+        if (!key) {
+            showMessage('Enter a key name', 'error');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setKey', key, status })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`Key ${key} created with status ${status}`, 'success');
+                document.getElementById('newKey').value = '';
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function deleteKey(key) {
+        if (!confirm(`Delete key "${key}"?`)) return;
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'deleteKey', key })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`Key ${key} deleted`, 'success');
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function toggleStatus(key, currentStatus) {
+        const newStatus = currentStatus === 'link' ? 'unlink' : 'link';
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setKey', key, status: newStatus })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`Key ${key} set to ${newStatus}`, 'success');
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function bindHwid(key) {
+        const hwid = prompt(`Enter HWID to bind to key "${key}":`);
+        if (!hwid) return;
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setKey', key, status: 'link', hwid })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`HWID ${hwid} bound to key ${key}`, 'success');
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function unbindHwid(key) {
+        if (!confirm(`Unbind HWID from key "${key}"?`)) return;
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setKey', key, status: 'link', hwid: null })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage(`HWID unbound from key ${key}`, 'success');
+                refreshKeys();
+            } else {
+                showMessage('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    function refreshKeys() {
+        fetchKeys(false);
+    }
+
+    // ---------- CODE MANAGEMENT ----------
+    async function saveCode() {
+        const code = document.getElementById('scriptCode').value;
+        if (!code.trim()) {
+            showMessage('Code cannot be empty', 'error');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'setCode', code })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showMessage('Code saved successfully!', 'success');
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #2ecc71;">✅ Saved</span>';
+            } else {
+                showMessage('Error saving code: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (e) {
+            showMessage('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function loadCode() {
+        try {
+            const resp = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, action: 'getCode' })
+            });
+            const data = await resp.json();
+            if (data.success && data.code !== undefined && data.code !== null) {
+                document.getElementById('scriptCode').value = data.code;
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #3498db;">📥 Loaded</span>';
+            } else {
+                document.getElementById('scriptCode').value = '';
+                document.getElementById('codeMessage').innerHTML = '<span style="color: #e67e22;">⚠️ No code found</span>';
+            }
+        } catch (e) {
+            document.getElementById('codeMessage').innerHTML = '<span style="color: #e74c3c;">❌ Error loading</span>';
+        }
+    }
+
+    function showMessage(msg, type) {
+        const div = document.getElementById('message');
+        div.innerHTML = `<p class="${type === 'error' ? 'error' : 'success-msg'}">${msg}</p>`;
+        setTimeout(() => div.innerHTML = '', 5000);
+    }
+</script>
+</body>
+</html>
