@@ -32,44 +32,45 @@ export default async function handler(req, res) {
         const keys = await redis.keys('key:*');
         const result = [];
         for (const k of keys) {
+          const data = await redis.get(k);
+          // data теперь содержит { status: 'link'|'unlink', hwid: '...' или null }
           const keyName = k.replace('key:', '');
-          const statusValue = await redis.get(k);
-          const hwidValue = await redis.get(`hwid:${keyName}`);
-          result.push({ key: keyName, status: statusValue, hwid: hwidValue || null });
+          result.push({
+            key: keyName,
+            status: data?.status || 'unlink',
+            hwid: data?.hwid || null
+          });
         }
         return res.json({ success: true, keys: result });
       }
 
-      case 'setKey':
+      case 'setKey': {
         if (!key || !['link', 'unlink'].includes(status)) {
           return res.status(400).json({ error: 'Invalid key or status' });
         }
-        await redis.set(`key:${key}`, status);
-        // Если передан hwid, то сохраняем его
-        if (hwid) {
-          await redis.set(`hwid:${key}`, hwid);
-        }
+        // Сохраняем статус и HWID (если передан)
+        const data = { status };
+        if (hwid) data.hwid = hwid;
+        await redis.set(`key:${key}`, data);
         return res.json({ success: true, message: `Key ${key} set to ${status}` });
+      }
 
-      case 'deleteKey':
+      case 'deleteKey': {
         if (!key) return res.status(400).json({ error: 'Key required' });
         await redis.del(`key:${key}`);
-        await redis.del(`hwid:${key}`);
         return res.json({ success: true, message: `Key ${key} deleted` });
+      }
 
-      case 'setCode':
+      case 'setCode': {
         if (!code) return res.status(400).json({ error: 'Code required' });
         await redis.set('script:code', code);
         return res.json({ success: true, message: 'Script code updated' });
+      }
 
-      case 'getCode':
+      case 'getCode': {
         const currentCode = await redis.get('script:code');
         return res.json({ success: true, code: currentCode });
-
-      case 'setHwid':
-        if (!key || !hwid) return res.status(400).json({ error: 'Key and HWID required' });
-        await redis.set(`hwid:${key}`, hwid);
-        return res.json({ success: true, message: `HWID set for key ${key}` });
+      }
 
       default:
         return res.status(400).json({ error: 'Invalid action' });
