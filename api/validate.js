@@ -27,37 +27,32 @@ export default async function handler(req, res) {
       return res.status(403).send('Invalid or unlinked key');
     }
 
-    // Проверка на использованный ключ (для одноразовых)
+    // ⚠️ ПРОВЕРКА НА ИСПОЛЬЗОВАННЫЙ КЛЮЧ
     if (data.used === true) {
       return res.status(403).send('Key already used');
     }
 
-    // Проверка HWID
     if (data.hwid && data.hwid !== hwid) {
       return res.status(403).send('HWID unauthorized');
     }
 
-    // Проверка MAC (если передан и не пустой)
     if (data.mac && mac && mac !== "" && data.mac !== mac) {
       return res.status(403).send('MAC unauthorized');
     }
 
-    // Привязываем HWID и MAC, если ещё не привязаны
     if (!data.hwid) data.hwid = hwid;
     if (!data.mac && mac && mac !== "") data.mac = mac;
 
-    // Получаем основной код
     const scriptCode = await redis.get('script:code');
     if (!scriptCode) {
       return res.status(404).send('Script code not found');
     }
 
-    // Если ключ одноразовый – помечаем как использованный
+    // ⚠️ ПОМЕЧАЕМ КЛЮЧ КАК ИСПОЛЬЗОВАННЫЙ, ЕСЛИ ОН ОДНОРАЗОВЫЙ
     if (data.oneTime === true) {
       data.used = true;
     }
 
-    // Сохраняем обновлённые данные
     await redis.set(`key:${key}`, data);
 
     res.setHeader('Content-Type', 'text/plain');
