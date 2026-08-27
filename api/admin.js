@@ -33,7 +33,6 @@ export default async function handler(req, res) {
         const result = [];
         for (const k of keys) {
           const data = await redis.get(k);
-          // data теперь содержит { status: 'link'|'unlink', hwid: '...' или null }
           const keyName = k.replace('key:', '');
           result.push({
             key: keyName,
@@ -48,9 +47,8 @@ export default async function handler(req, res) {
         if (!key || !['link', 'unlink'].includes(status)) {
           return res.status(400).json({ error: 'Invalid key or status' });
         }
-        // Сохраняем статус и HWID (если передан)
         const data = { status };
-        if (hwid) data.hwid = hwid;
+        if (hwid !== undefined) data.hwid = hwid;
         await redis.set(`key:${key}`, data);
         return res.json({ success: true, message: `Key ${key} set to ${status}` });
       }
