@@ -640,6 +640,8 @@
             if (entry.hwid) parts.push('hwid=' + String(entry.hwid).slice(0, 12));
             if (entry.fp) parts.push('fp=' + String(entry.fp).slice(0, 12));
             if (entry.reason) parts.push(entry.reason);
+            if (entry.got) parts.push('got="' + entry.got + '"');
+            if (entry.chunks) parts.push('chunks=' + entry.chunks);
             if (entry.kick) parts.push('[KICK]');
             if (entry.ip) parts.push(entry.ip);
             return { time, text: parts.join('  ') };
