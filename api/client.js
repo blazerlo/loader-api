@@ -1,6 +1,6 @@
 import { redis } from './lib/redis.js';
 import { addLog } from './lib/logs.js';
-import { resolveKey } from './lib/secret.js';
+import { resolveKey, unmerge } from './lib/secret.js';
 
 function deny(res, status, detail) {
   res.setHeader('Content-Type', 'application/json');
@@ -16,10 +16,14 @@ export default async function handler(req, res) {
   const Key = resolveKey(req);
 
   if (!Key) {
+    const split = unmerge(req.query.Key);
     await addLog('script', {
       level: 'error',
       event: 'client_forbidden',
       got: String(req.query.Key || '').slice(0, 40),
+      len: String(req.query.Key || '').length,
+      partKey: split ? split.key : 'n/a',
+      partSecret: split ? split.secret : 'n/a',
     });
     return deny(res, 403, 'Forbidden');
   }
