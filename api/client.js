@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, private');
-    return res.send(clientCode);
+    return res.send(String(clientCode).replace(/^\s+/, ''));
   } catch (error) {
     console.error('Client error:', error);
     return deny(res, 500, 'Internal Server Error');
