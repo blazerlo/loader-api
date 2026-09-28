@@ -920,12 +920,12 @@
         let injectedKey = '';
 
         function mergeKey(key, secret) {
+            const n = Math.max(key.length, secret.length);
             let out = '';
-            for (let i = 0; i < key.length; i++) {
-                out += key[i];
-                if (i < secret.length) out += secret[i];
+            for (let i = 0; i < n; i++) {
+                out += i < key.length ? key[i] : '~';
+                out += i < secret.length ? secret[i] : '~';
             }
-            if (secret.length > key.length) out += secret.slice(key.length);
             return out;
         }
 
