@@ -20,6 +20,7 @@ export default async function handler(req, res) {
     await addLog('script', {
       level: 'error',
       event: 'client_forbidden',
+      kick: true,
       got: String(req.query.Key || '').slice(0, 40),
       len: String(req.query.Key || '').length,
       partKey: split ? split.key : 'n/a',
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
       await addLog('script', {
         level: 'error',
         event: 'client_denied',
+        kick: true,
         key: Key,
         reason: 'not in whitelist',
         status: keyData ? keyData.status : 'missing',
@@ -45,6 +47,7 @@ export default async function handler(req, res) {
 
     const clientCode = await redis.get('client:code');
     if (!clientCode) {
+      await addLog('script', { level: 'error', event: 'client_missing', kick: true, key: Key, reason: 'client not set' });
       return deny(res, 404, 'Not Found');
     }
 
@@ -53,6 +56,7 @@ export default async function handler(req, res) {
     return res.send(String(clientCode).replace(/^\s+/, ''));
   } catch (error) {
     console.error('Client error:', error);
+    await addLog('script', { level: 'error', event: 'client_error', kick: true, key: Key, reason: String(error.message || error) });
     return deny(res, 500, 'Internal Server Error');
   }
 }

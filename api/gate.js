@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   if (!resolveKey(req)) {
     await addLog('script', {
       level: 'error',
-      event: 'gate_forbidden',
+      event: 'gate_forbidden', kick: true,
       got: String(req.query.Key || '').slice(0, 40),
     });
     return res.status(403).json({ error: 'Forbidden' });
@@ -38,12 +38,12 @@ export default async function handler(req, res) {
   const ip = clientIp(req);
 
   if (!Key || typeof Key !== 'string') {
-    await addLog('script', { level: 'error', event: 'gate_rejected', reason: 'Key required', ip });
+    await addLog('script', { level: 'error', event: 'gate_rejected', kick: true, reason: 'Key required', ip });
     return res.status(400).json({ error: 'Key required' });
   }
 
   if (!fingerprint || typeof fingerprint !== 'string') {
-    await addLog('script', { level: 'error', event: 'gate_rejected', reason: 'Fingerprint required', key: Key, ip });
+    await addLog('script', { level: 'error', event: 'gate_rejected', kick: true, reason: 'Fingerprint required', key: Key, ip });
     return res.status(400).json({ error: 'Fingerprint required' });
   }
 
@@ -51,17 +51,17 @@ export default async function handler(req, res) {
     const data = await redis.get(`key:${Key}`);
 
     if (!data) {
-      await addLog('script', { level: 'error', event: 'key_not_found', key: Key, fp: fingerprint, ip });
+      await addLog('script', { level: 'error', event: 'key_not_found', kick: true, key: Key, fp: fingerprint, ip });
       return res.status(403).json({ error: 'Invalid or unlinked key' });
     }
 
     if (data.status !== 'link') {
-      await addLog('script', { level: 'error', event: 'key_unlinked', key: Key, ip });
+      await addLog('script', { level: 'error', event: 'key_unlinked', kick: true, key: Key, ip });
       return res.status(403).json({ error: 'Invalid or unlinked key' });
     }
 
     if (data.used === true) {
-      await addLog('script', { level: 'error', event: 'key_already_used', key: Key, ip });
+      await addLog('script', { level: 'error', event: 'key_already_used', kick: true, key: Key, ip });
       return res.status(403).json({ error: 'Key already used' });
     }
 
@@ -69,13 +69,13 @@ export default async function handler(req, res) {
     const fpHash = hashFingerprint(hwid, fingerprint);
 
     if (data.fingerprint && data.fingerprint !== fpHash) {
-      await addLog('script', { level: 'error', event: 'fingerprint_mismatch', key: Key, ip });
+      await addLog('script', { level: 'error', event: 'fingerprint_mismatch', kick: true, key: Key, ip });
       return res.status(403).json({ error: 'Fingerprint mismatch' });
     }
 
     const sessionResult = await createSession(Key, hwid, fpHash);
     if (!sessionResult.ok) {
-      await addLog('script', { level: 'error', event: 'session_denied', key: Key, reason: sessionResult.reason, ip });
+      await addLog('script', { level: 'error', event: 'session_denied', kick: true, key: Key, reason: sessionResult.reason, ip });
       return res.status(403).json({ error: sessionResult.reason });
     }
 
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Gate error:', error);
-    await addLog('script', { level: 'error', event: 'gate_error', key: Key, reason: String(error.message || error), ip });
+    await addLog('script', { level: 'error', event: 'gate_error', kick: true, key: Key, reason: String(error.message || error), ip });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

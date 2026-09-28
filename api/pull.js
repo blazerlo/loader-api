@@ -52,13 +52,13 @@ export default async function handler(req, res) {
   try {
     const tokenData = await redis.get(`token:${token}`);
     if (!tokenData) {
-      await addLog('script', { level: 'error', event: 'pull_token_expired', ip });
+      await addLog('script', { level: 'error', event: 'pull_token_expired', kick: true, ip });
       return res.status(403).send('Invalid or expired session');
     }
 
     const fpHash = hashFingerprint(tokenData.hwid, fingerprint);
     if (tokenData.fingerprint !== fpHash) {
-      await addLog('script', { level: 'error', event: 'pull_fingerprint_mismatch', key: tokenData.key, ip });
+      await addLog('script', { level: 'error', event: 'pull_fingerprint_mismatch', kick: true, key: tokenData.key, ip });
       return res.status(403).send('Fingerprint mismatch');
     }
 
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     return res.send(JSON.stringify({ iv: token, chunks: payload }));
   } catch (error) {
     console.error('Pull error:', error);
-    await addLog('script', { level: 'error', event: 'pull_error', reason: String(error.message || error), ip });
+    await addLog('script', { level: 'error', event: 'pull_error', kick: true, reason: String(error.message || error), ip });
     return res.status(500).send('Internal server error');
   }
 }
