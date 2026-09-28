@@ -2,7 +2,7 @@ import { createSession } from './lib/session.js';
 import { generateToken, hashFingerprint } from './lib/crypto.js';
 import { redis } from './lib/redis.js';
 import { addLog } from './lib/logs.js';
-import { isAuthorized, extractKey } from './lib/secret.js';
+import { resolveKey } from './lib/secret.js';
 
 const TOKEN_TTL = 120;
 
@@ -20,12 +20,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!isAuthorized(req, req.query.Key)) {
+  if (!resolveKey(req)) {
     await addLog('script', { level: 'error', event: 'gate_rejected', reason: 'Forbidden' });
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const Key = extractKey(req.query.Key);
+  const Key = resolveKey(req);
   const fingerprint =
     req.headers['fingerprint'] ||
     req.query.fingerprint ||

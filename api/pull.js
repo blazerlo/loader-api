@@ -2,10 +2,39 @@ import { xorEncrypt, hashFingerprint } from './lib/crypto.js';
 import { redis } from './lib/redis.js';
 import { addLog } from './lib/logs.js';
 
-function clientIp(req) {
-  const fwd = req.headers['x-forwarded-for'];
-  if (fwd) return String(fwd).split(',')[0].trim();
-  return req.socket?.remoteAddress || 'unknown';
+const CHUNK_SPLIT = process.env.SPLIT_SCRIPT !== 'off';
+
+function splitLua(code) {
+  const lines = code.split('\n');
+  const chunks = [];
+  let current = [];
+  let depth = 0;
+  let inBlockComment = false;
+
+  for (const line of lines) {
+    current.push(line);
+
+    const trimmed = line.trim();
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) inBlockComment = false;
+    } else if (trimmed.startsWith('--[[') || trimmed.startsWith('--[[[')) {
+      inBlockComment = !trimmed.includes(']]');
+    }
+
+    for (const ch of line) {
+      if (ch === '(' || ch === '{' || ch === '[') depth++;
+      else if (ch === ')' || ch === '}' || ch === ']') depth--;
+    }
+    if (depth < 0) depth = 0;
+
+    if (!inBlockComment && depth === 0 && trimmed === '') {
+      chunks.push(current.join('\n'));
+      current = [];
+    }
+  }
+
+  if (current.length) chunks.push(current.join('\n'));
+  return chunks.filter(c => c.trim().length);
 }
 
 export default async function handler(req, res) {
@@ -15,7 +44,7 @@ export default async function handler(req, res) {
 
   const token = req.headers['x-session-token'];
   const fingerprint = req.headers['fingerprint'];
-  const ip = clientIp(req);
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
 
   if (!token) return res.status(400).send('Session token required');
   if (!fingerprint) return res.status(400).send('Fingerprint required');
@@ -39,7 +68,15 @@ export default async function handler(req, res) {
       return res.status(404).send('Script not found');
     }
 
-    const encrypted = xorEncrypt(scriptCode, token);
+    if (!CHUNK_SPLIT) {
+      const encrypted = xorEncrypt(scriptCode, token);
+      await addLog('script', { level: 'success', event: 'script_pulled', key: tokenData.key, hwid: tokenData.hwid, size: scriptCode.length, chunks: 1, ip });
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send(encrypted);
+    }
+
+    const chunks = splitLua(scriptCode);
+    const payload = chunks.map((chunk, i) => xorEncrypt(chunk, `${token}:${i}`));
 
     await addLog('script', {
       level: 'success',
@@ -47,11 +84,13 @@ export default async function handler(req, res) {
       key: tokenData.key,
       hwid: tokenData.hwid,
       size: scriptCode.length,
+      chunks: payload.length,
       ip,
     });
 
-    res.setHeader('Content-Type', 'text/plain');
-    return res.send(encrypted);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(JSON.stringify({ iv: token, chunks: payload }));
   } catch (error) {
     console.error('Pull error:', error);
     await addLog('script', { level: 'error', event: 'pull_error', reason: String(error.message || error), ip });

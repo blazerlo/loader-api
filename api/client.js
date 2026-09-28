@@ -1,6 +1,6 @@
 import { redis } from './lib/redis.js';
 import { addLog } from './lib/logs.js';
-import { isAuthorized, extractKey } from './lib/secret.js';
+import { resolveKey } from './lib/secret.js';
 
 function deny(res, status, detail) {
   res.setHeader('Content-Type', 'application/json');
@@ -13,11 +13,7 @@ export default async function handler(req, res) {
     return deny(res, 405, 'Method Not Allowed');
   }
 
-  if (!isAuthorized(req, req.query.Key)) {
-    return deny(res, 403, 'Forbidden');
-  }
-
-  const Key = extractKey(req.query.Key);
+  const Key = resolveKey(req);
 
   if (!Key) {
     return deny(res, 403, 'Forbidden');

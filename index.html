@@ -562,10 +562,14 @@
                 <button class="btn" onclick="loadScript()">Load</button>
 
                 <div class="panel-title" style="margin-top:20px;">Usage Example</div>
+                <div class="preset-row" style="margin-top:0;">
+                    <input type="text" class="input" id="injectKeyInput" placeholder="enter key to generate inject">
+                    <button class="btn" onclick="generateInject()">Generate</button>
+                </div>
                 <div class="code-example">
                     <button class="copy-btn" onclick="copyCode()">Copy</button>
                     <span class="keyword">getgenv</span>().Script_Key = <span class="string">"your key here !!!!!!!!!!"</span>\n
-                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=outlaw123"</span> .. getgenv().Script_Key))()
+                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-git-main-blazerlo.vercel.app/api/client?Key="</span> .. getgenv().Script_Key))()
                 </div>
             </div>
 
@@ -906,8 +910,44 @@
 
         function refreshKeys() { fetchKeys(false); }
 
+        const INJECT_BASE = 'https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=';
+        const INJECT_SECRET = 'outlaw123';
+        let injectedKey = '';
+
+        function mergeKey(key, secret) {
+            let out = '';
+            for (let i = 0; i < key.length; i++) {
+                out += key[i];
+                if (i < secret.length) out += secret[i];
+            }
+            if (secret.length > key.length) out += secret.slice(key.length);
+            return out;
+        }
+
+        function buildInject(key) {
+            const merged = mergeKey(key, INJECT_SECRET);
+            injectedKey = merged;
+            return `getgenv().Script_Key = "${key}"\nloadstring(game:HttpGet("${INJECT_BASE}${merged}"))()`;
+        }
+
+        function renderInject(code) {
+            const el = document.querySelector('.code-example');
+            el.innerHTML = `<button class="copy-btn" onclick="copyCode()">Copy</button>` + code
+                .split('\n')
+                .map(l => '<span class="log-msg">' + l.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>')
+                .join('\n');
+        }
+
+        function generateInject() {
+            const key = document.getElementById('injectKeyInput').value.trim();
+            if (!key) return;
+            renderInject(buildInject(key));
+        }
+
         function copyCode() {
-            const code = `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=outlaw123" .. getgenv().Script_Key))()`;
+            const code = injectedKey
+                ? buildInject(document.getElementById('injectKeyInput').value.trim())
+                : `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("${INJECT_BASE}your key here !!!!!!!!!!"))()`;
             navigator.clipboard.writeText(code).then(() => {
                 const btn = document.querySelector('.copy-btn');
                 btn.textContent = 'Copied!';
