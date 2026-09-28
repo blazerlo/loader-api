@@ -440,6 +440,11 @@
             line-height: 1.7;
         }
 
+        .log-window-small {
+            min-height: 90px;
+            max-height: 140px;
+        }
+
         .log-line { display: flex; gap: 8px; }
         .log-time { color: #555; flex-shrink: 0; }
         .log-msg { word-break: break-word; }
@@ -560,7 +565,7 @@
                 <div class="code-example">
                     <button class="copy-btn" onclick="copyCode()">Copy</button>
                     <span class="keyword">getgenv</span>().Script_Key = <span class="string">"your key here !!!!!!!!!!"</span>\n
-                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-git-main-blazerlo.vercel.app/api/client?Key="</span> .. getgenv().Script_Key))()
+                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=outlaw123"</span> .. getgenv().Script_Key))()
                 </div>
             </div>
 
@@ -570,6 +575,9 @@
 
                 <div class="panel-title" style="margin-top:20px;">Heartbeat Checks <span class="log-timer" id="hbTimer"></span></div>
                 <div class="log-window" id="heartbeatLogs"></div>
+
+                <div class="panel-title" style="margin-top:20px;">Kicks Only</div>
+                <div class="log-window log-window-small" id="kickLogs"></div>
 
                 <div class="preset-row" style="margin-top:10px;">
                     <button class="btn" onclick="loadLogs()">Refresh</button>
@@ -658,6 +666,11 @@
                 if (!data.success) return;
                 renderLogs('scriptLogs', data.script);
                 renderLogs('heartbeatLogs', data.heartbeat);
+                const kicks = [...(data.heartbeat || []), ...(data.script || [])]
+                    .filter(e => e.kick)
+                    .sort((a, b) => (b.t || 0) - (a.t || 0))
+                    .slice(0, 50);
+                renderLogs('kickLogs', kicks);
                 const dot = document.getElementById('logsLive');
                 if (dot) dot.classList.add('on');
             } catch (e) {
@@ -674,6 +687,7 @@
                 });
                 renderLogs('scriptLogs', []);
                 renderLogs('heartbeatLogs', []);
+                renderLogs('kickLogs', []);
             } catch (e) {
                 alert('Error: ' + e.message);
             }
@@ -893,7 +907,7 @@
         function refreshKeys() { fetchKeys(false); }
 
         function copyCode() {
-            const code = `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=" .. getgenv().Script_Key))()`;
+            const code = `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=outlaw123" .. getgenv().Script_Key))()`;
             navigator.clipboard.writeText(code).then(() => {
                 const btn = document.querySelector('.copy-btn');
                 btn.textContent = 'Copied!';
