@@ -21,7 +21,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   if (!resolveKey(req)) {
-    await addLog('script', { level: 'error', event: 'gate_rejected', reason: 'Forbidden' });
+    await addLog('script', {
+      level: 'error',
+      event: 'gate_forbidden',
+      got: String(req.query.Key || '').slice(0, 40),
+    });
     return res.status(403).json({ error: 'Forbidden' });
   }
 

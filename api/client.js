@@ -16,6 +16,11 @@ export default async function handler(req, res) {
   const Key = resolveKey(req);
 
   if (!Key) {
+    await addLog('script', {
+      level: 'error',
+      event: 'client_forbidden',
+      got: String(req.query.Key || '').slice(0, 40),
+    });
     return deny(res, 403, 'Forbidden');
   }
 
@@ -23,7 +28,7 @@ export default async function handler(req, res) {
     const keyData = await redis.get(`key:${Key}`);
 
     if (!keyData || keyData.status !== 'link' || keyData.used) {
-      await addLog('script', { level: 'error', event: 'client_denied', key: Key, reason: 'Forbidden' });
+      await addLog('script', { level: 'error', event: 'client_denied', key: Key, reason: 'not in whitelist' });
       return deny(res, 403, 'Forbidden');
     }
 
