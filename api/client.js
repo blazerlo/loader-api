@@ -32,7 +32,14 @@ export default async function handler(req, res) {
     const keyData = await redis.get(`key:${Key}`);
 
     if (!keyData || keyData.status !== 'link' || keyData.used) {
-      await addLog('script', { level: 'error', event: 'client_denied', key: Key, reason: 'not in whitelist' });
+      await addLog('script', {
+        level: 'error',
+        event: 'client_denied',
+        key: Key,
+        reason: 'not in whitelist',
+        status: keyData ? keyData.status : 'missing',
+        used: keyData && keyData.used ? 'yes' : 'no',
+      });
       return deny(res, 403, 'Forbidden');
     }
 

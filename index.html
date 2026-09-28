@@ -551,8 +551,7 @@
             </div>
 
             <div class="panel tab-panel hidden" id="tab-script">
-                <div class="panel-title">Client Code <span class="script-indicator" id="clientIndicator"></span></div>
-                <textarea class="code-editor" id="clientEditor" placeholder="-- Client side code (gate / pull / decrypt)"></textarea>
+                <div class="panel-title">Client Code <span class="script-indicator" id="clientIndicator"></span></div>                <textarea class="code-editor" id="clientEditor" placeholder="-- Client side code (gate / pull / decrypt)"></textarea>
                 <button class="btn primary" onclick="saveClient()">Save Client</button>
                 <button class="btn" onclick="loadClient()">Load</button>
 
@@ -644,6 +643,8 @@
             if (entry.len) parts.push('len=' + entry.len);
             if (entry.partKey) parts.push('partKey=' + entry.partKey);
             if (entry.partSecret) parts.push('partSecret=' + entry.partSecret);
+            if (entry.status) parts.push('status=' + entry.status);
+            if (entry.used) parts.push('used=' + entry.used);
             if (entry.chunks) parts.push('chunks=' + entry.chunks);
             if (entry.kick) parts.push('[KICK]');
             if (entry.ip) parts.push(entry.ip);
