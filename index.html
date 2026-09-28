@@ -560,7 +560,7 @@
                 <div class="code-example">
                     <button class="copy-btn" onclick="copyCode()">Copy</button>
                     <span class="keyword">getgenv</span>().Script_Key = <span class="string">"your key here !!!!!!!!!!"</span>\n
-                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-pi.vercel.app/api/client?Key="</span> .. getgenv().Script_Key))()
+                    <span class="keyword">loadstring</span>(<span class="keyword">game</span>:<span class="func">HttpGet</span>(<span class="string">"https://loader-api-git-main-blazerlo.vercel.app/api/client?Key="</span> .. getgenv().Script_Key))()
                 </div>
             </div>
 
@@ -893,7 +893,7 @@
         function refreshKeys() { fetchKeys(false); }
 
         function copyCode() {
-            const code = `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("https://loader-api-pi.vercel.app/api/client?Key=" .. getgenv().Script_Key))()`;
+            const code = `getgenv().Script_Key = "your key here !!!!!!!!!!"\nloadstring(game:HttpGet("https://loader-api-git-main-blazerlo.vercel.app/api/client?Key=" .. getgenv().Script_Key))()`;
             navigator.clipboard.writeText(code).then(() => {
                 const btn = document.querySelector('.copy-btn');
                 btn.textContent = 'Copied!';
